@@ -108,6 +108,19 @@ Run one of the training scripts:
 python train_strictish_h2_d6_singlecarry_from_scratch.py --device cpu
 ```
 
+## AdderBoard Verification
+
+This repo includes an AdderBoard-compatible submission file:
+
+- `adderboard_submission.py`
+
+Verify it with the official checker:
+
+```bash
+git clone https://github.com/anadim/AdderBoard.git /tmp/AdderBoard
+python /tmp/AdderBoard/verify.py adderboard_submission.py --seed 2025 --num-tests 10000
+```
+
 Run the visualizer by opening:
 
 `interactive_strictish_sub300_visualizer.html`
