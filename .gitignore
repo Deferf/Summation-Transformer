@@ -1,0 +1,12 @@
+.venv/
+__pycache__/
+*.pyc
+.DS_Store
+
+# Local training artifacts
+checkpoints/*.pt
+checkpoints/*.png
+checkpoints/tmp_*.pt
+
+# Matplotlib cache
+.mplconfig/

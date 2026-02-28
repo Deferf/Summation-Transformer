@@ -1,0 +1,746 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Strict-ish Sub300 Transformer Visualizer</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=IBM+Plex+Mono:wght@400;500&display=swap');
+
+    :root {
+      --bg0: #09121b;
+      --bg1: #102233;
+      --bg2: #0f1b2a;
+      --card: rgba(255, 255, 255, 0.08);
+      --line: rgba(255, 255, 255, 0.22);
+      --text: #edf4fb;
+      --muted: #b4c3d4;
+      --accent: #ff8a3d;
+      --accent2: #2ed8b6;
+      --accent3: #ffcf56;
+      --warn: #ff6a5a;
+      --shadow: 0 14px 35px rgba(0, 0, 0, 0.35);
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      color: var(--text);
+      font-family: 'Space Grotesk', 'Avenir Next', 'Segoe UI', sans-serif;
+      background:
+        radial-gradient(1200px 700px at -10% -10%, rgba(46, 216, 182, 0.18), transparent 60%),
+        radial-gradient(1000px 700px at 110% 10%, rgba(255, 138, 61, 0.22), transparent 58%),
+        linear-gradient(145deg, var(--bg0), var(--bg1) 55%, var(--bg2));
+      min-height: 100vh;
+    }
+
+    .page {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 24px 18px 48px;
+    }
+
+    .hero {
+      border: 1px solid var(--line);
+      background: linear-gradient(125deg, rgba(255, 255, 255, 0.09), rgba(255, 255, 255, 0.04));
+      border-radius: 18px;
+      padding: 20px;
+      box-shadow: var(--shadow);
+      backdrop-filter: blur(6px);
+    }
+
+    .title {
+      margin: 0;
+      font-size: clamp(1.2rem, 2.8vw, 2rem);
+      font-weight: 700;
+      letter-spacing: 0.01em;
+    }
+
+    .subtitle {
+      margin: 8px 0 0;
+      color: var(--muted);
+      font-size: 0.96rem;
+      line-height: 1.4;
+    }
+
+    .controls {
+      margin-top: 16px;
+      display: grid;
+      grid-template-columns: repeat(12, 1fr);
+      gap: 10px;
+      align-items: end;
+    }
+
+    .field {
+      grid-column: span 4;
+      display: grid;
+      gap: 5px;
+    }
+
+    .field label {
+      font-size: 0.86rem;
+      color: var(--muted);
+    }
+
+    input[type="text"] {
+      width: 100%;
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 11px 12px;
+      background: rgba(0, 0, 0, 0.24);
+      color: var(--text);
+      font-family: 'IBM Plex Mono', 'Menlo', monospace;
+      font-size: 0.95rem;
+      letter-spacing: 0.03em;
+    }
+
+    input[type="range"] {
+      width: 100%;
+      accent-color: var(--accent);
+    }
+
+    .btns {
+      grid-column: span 4;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      justify-content: flex-end;
+    }
+
+    button {
+      border: 1px solid rgba(255, 255, 255, 0.28);
+      border-radius: 11px;
+      padding: 10px 13px;
+      background: rgba(255, 255, 255, 0.1);
+      color: var(--text);
+      font-family: inherit;
+      font-weight: 600;
+      cursor: pointer;
+      transition: transform 0.12s ease, background 0.12s ease;
+    }
+
+    button.primary {
+      border-color: rgba(255, 138, 61, 0.7);
+      background: linear-gradient(115deg, rgba(255, 138, 61, 0.34), rgba(255, 207, 86, 0.26));
+    }
+
+    button:hover {
+      transform: translateY(-1px);
+      background: rgba(255, 255, 255, 0.16);
+    }
+
+    .step-wrap {
+      grid-column: span 12;
+      margin-top: 6px;
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      background: rgba(0, 0, 0, 0.2);
+      padding: 10px 12px;
+    }
+
+    .step-top {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      gap: 12px;
+      margin-bottom: 6px;
+      color: var(--muted);
+      font-size: 0.88rem;
+    }
+
+    .mono {
+      font-family: 'IBM Plex Mono', 'Menlo', monospace;
+    }
+
+    .grid {
+      margin-top: 16px;
+      display: grid;
+      grid-template-columns: 1.1fr 0.9fr;
+      gap: 14px;
+    }
+
+    .card {
+      border: 1px solid var(--line);
+      border-radius: 15px;
+      background: var(--card);
+      box-shadow: var(--shadow);
+      padding: 14px;
+      animation: appear 0.35s ease;
+    }
+
+    @keyframes appear {
+      from {
+        opacity: 0;
+        transform: translateY(6px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    .card h3 {
+      margin: 0 0 10px;
+      font-size: 0.96rem;
+      font-weight: 700;
+      letter-spacing: 0.03em;
+      text-transform: uppercase;
+      color: #dbe8f5;
+    }
+
+    .chip-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+
+    .chip {
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      padding: 5px 10px;
+      font-size: 0.78rem;
+      color: var(--muted);
+      background: rgba(0, 0, 0, 0.24);
+      font-family: 'IBM Plex Mono', 'Menlo', monospace;
+    }
+
+    .chip.active {
+      color: #0a131b;
+      border-color: transparent;
+      background: linear-gradient(120deg, var(--accent), var(--accent3));
+      font-weight: 700;
+    }
+
+    .chip.carry {
+      background: rgba(46, 216, 182, 0.2);
+      color: #c8fff3;
+    }
+
+    .chip.out {
+      background: rgba(255, 138, 61, 0.22);
+      color: #ffe0cc;
+    }
+
+    .kv {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 8px;
+      margin-top: 8px;
+    }
+
+    .kv div {
+      border: 1px solid var(--line);
+      border-radius: 11px;
+      padding: 8px;
+      background: rgba(0, 0, 0, 0.18);
+      font-size: 0.84rem;
+    }
+
+    .kv .k {
+      color: var(--muted);
+      display: block;
+      margin-bottom: 3px;
+      font-size: 0.75rem;
+      letter-spacing: 0.02em;
+      text-transform: uppercase;
+    }
+
+    .pipeline {
+      margin-top: 8px;
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      gap: 8px;
+      align-items: stretch;
+    }
+
+    .stage {
+      border: 1px solid var(--line);
+      border-radius: 11px;
+      background: rgba(0, 0, 0, 0.2);
+      padding: 8px;
+      font-size: 0.8rem;
+    }
+
+    .stage b {
+      display: block;
+      color: #fff;
+      margin-bottom: 5px;
+      font-size: 0.78rem;
+      text-transform: uppercase;
+      letter-spacing: 0.02em;
+    }
+
+    .svg-wrap {
+      display: grid;
+      gap: 8px;
+    }
+
+    svg {
+      width: 100%;
+      height: auto;
+      border-radius: 11px;
+      border: 1px solid var(--line);
+      background: rgba(0, 0, 0, 0.2);
+    }
+
+    .legend {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      font-size: 0.78rem;
+      color: var(--muted);
+    }
+
+    .dot {
+      display: inline-block;
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      margin-right: 5px;
+      vertical-align: middle;
+    }
+
+    .sumline {
+      margin-top: 10px;
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 10px;
+      background: rgba(0, 0, 0, 0.22);
+      font-family: 'IBM Plex Mono', 'Menlo', monospace;
+      font-size: 0.9rem;
+    }
+
+    .ok {
+      color: #b0ffe9;
+    }
+
+    .bad {
+      color: #ffc4c0;
+    }
+
+    .foot {
+      margin-top: 12px;
+      color: var(--muted);
+      font-size: 0.8rem;
+    }
+
+    @media (max-width: 980px) {
+      .grid {
+        grid-template-columns: 1fr;
+      }
+      .field {
+        grid-column: span 6;
+      }
+      .btns {
+        grid-column: span 12;
+        justify-content: flex-start;
+      }
+      .pipeline {
+        grid-template-columns: 1fr 1fr;
+      }
+    }
+
+    @media (max-width: 680px) {
+      .field {
+        grid-column: span 12;
+      }
+      .pipeline {
+        grid-template-columns: 1fr;
+      }
+      .kv {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main class="page">
+    <section class="hero">
+      <h1 class="title">Strict-ish Sub300 Transformer Visualizer</h1>
+      <p class="subtitle">
+        Explore how each digit-pair token <span class="mono">X[d1,d2]</span> is transformed through unit-circle embedding,
+        attention routing, and decoding into <span class="mono">Y[d,carry]</span>.
+      </p>
+
+      <div class="controls">
+        <div class="field">
+          <label for="aInput">Number A (10 digits)</label>
+          <input id="aInput" type="text" class="mono" value="1234567890" maxlength="10" />
+        </div>
+
+        <div class="field">
+          <label for="bInput">Number B (10 digits)</label>
+          <input id="bInput" type="text" class="mono" value="9876543210" maxlength="10" />
+        </div>
+
+        <div class="btns">
+          <button id="randomBtn">Randomize</button>
+          <button id="playBtn" class="primary">Play</button>
+          <button id="recalcBtn">Recompute</button>
+        </div>
+
+        <div class="step-wrap">
+          <div class="step-top">
+            <span id="stepLabel">Step k=0 (LSD)</span>
+            <span id="posLabel" class="mono">Model position p=11</span>
+          </div>
+          <input id="stepSlider" type="range" min="0" max="10" value="0" />
+        </div>
+      </div>
+    </section>
+
+    <section class="grid">
+      <article class="card">
+        <h3>Token Flow</h3>
+        <div id="prefixRow" class="chip-row"></div>
+        <div style="height:8px"></div>
+        <div id="outRow" class="chip-row"></div>
+
+        <div class="sumline" id="sumLine"></div>
+        <p class="foot">Sequence layout: <span class="mono">[BOS] X0..X9 [C0] Y0..Y10 [EOS]</span> (LSD-first internals).</p>
+      </article>
+
+      <article class="card">
+        <h3>Routing At Current Step</h3>
+        <div class="kv" id="routingKv"></div>
+        <div class="foot">Head0 and Head1 read <span class="mono">Xk</span> (or <span class="mono">BOS</span> at k=10). Head2 reads carry token (<span class="mono">C0</span> or previous <span class="mono">Y</span>).</div>
+      </article>
+
+      <article class="card">
+        <h3>Unit Circle Embedding</h3>
+        <div class="svg-wrap">
+          <svg id="circleSvg" viewBox="0 0 360 360" role="img" aria-label="digit embeddings on unit circle"></svg>
+          <div class="legend">
+            <span><span class="dot" style="background:#ff8a3d"></span>d1 vector</span>
+            <span><span class="dot" style="background:#2ed8b6"></span>d2 vector</span>
+            <span><span class="dot" style="background:#ffcf56"></span>out digit</span>
+          </div>
+        </div>
+      </article>
+
+      <article class="card">
+        <h3>Transformation Pipeline</h3>
+        <div class="pipeline" id="pipeline"></div>
+      </article>
+    </section>
+  </main>
+
+  <script>
+    const DIGIT_BASIS = Array.from({ length: 10 }, (_, d) => {
+      const theta = (2 * Math.PI * d) / 10;
+      return { x: Math.cos(theta), y: Math.sin(theta) };
+    });
+
+    const state = {
+      a: '1234567890',
+      b: '9876543210',
+      steps: [],
+      outputs: [],
+      stepIndex: 0,
+      timer: null,
+      isPlaying: false,
+    };
+
+    const els = {
+      aInput: document.getElementById('aInput'),
+      bInput: document.getElementById('bInput'),
+      randomBtn: document.getElementById('randomBtn'),
+      playBtn: document.getElementById('playBtn'),
+      recalcBtn: document.getElementById('recalcBtn'),
+      stepSlider: document.getElementById('stepSlider'),
+      stepLabel: document.getElementById('stepLabel'),
+      posLabel: document.getElementById('posLabel'),
+      prefixRow: document.getElementById('prefixRow'),
+      outRow: document.getElementById('outRow'),
+      routingKv: document.getElementById('routingKv'),
+      sumLine: document.getElementById('sumLine'),
+      circleSvg: document.getElementById('circleSvg'),
+      pipeline: document.getElementById('pipeline'),
+    };
+
+    function clampDigits(s) {
+      return (s || '').replace(/\D/g, '').slice(0, 10);
+    }
+
+    function pad10(s) {
+      return s.padStart(10, '0');
+    }
+
+    function reversedDigits(num10) {
+      return [...num10].reverse().map((ch) => Number(ch));
+    }
+
+    function nearestDigit(x, y) {
+      let best = 0;
+      let bestScore = -Infinity;
+      for (let d = 0; d < 10; d++) {
+        const b = DIGIT_BASIS[d];
+        const score = x * b.x + y * b.y;
+        if (score > bestScore) {
+          bestScore = score;
+          best = d;
+        }
+      }
+      return best;
+    }
+
+    function computeSteps(aRaw, bRaw) {
+      const a10 = pad10(clampDigits(aRaw));
+      const b10 = pad10(clampDigits(bRaw));
+      const aDigits = reversedDigits(a10);
+      const bDigits = reversedDigits(b10);
+
+      const steps = [];
+      const yOut = [];
+      let carryIn = 0;
+
+      for (let k = 0; k <= 10; k++) {
+        const d1 = k < 10 ? aDigits[k] : 0;
+        const d2 = k < 10 ? bDigits[k] : 0;
+        const v1 = DIGIT_BASIS[d1];
+        const v2 = DIGIT_BASIS[d2];
+
+        const hidden = {
+          d1x: v1.x,
+          d1y: v1.y,
+          d2x: v2.x,
+          d2y: v2.y,
+          c0: carryIn === 0 ? 1 : 0,
+          c1: carryIn === 1 ? 1 : 0,
+        };
+
+        const d1Pred = nearestDigit(hidden.d1x, hidden.d1y);
+        const d2Pred = nearestDigit(hidden.d2x, hidden.d2y);
+        const carryPred = hidden.c1 > hidden.c0 ? 1 : 0;
+
+        const s = d1Pred + d2Pred + carryPred;
+        const outDigit = s % 10;
+        const outCarry = Math.floor(s / 10);
+
+        const outToken = `Y[${outDigit},${outCarry}]`;
+        yOut.push({ digit: outDigit, carry: outCarry, token: outToken });
+
+        const p = 11 + k;
+        steps.push({
+          k,
+          p,
+          d1,
+          d2,
+          carryIn,
+          hidden,
+          d1Pred,
+          d2Pred,
+          sum: s,
+          outDigit,
+          outCarry,
+          outToken,
+          head0: k < 10 ? `X${k}` : 'BOS',
+          head1: k < 10 ? `X${k}` : 'BOS',
+          head2: k === 0 ? 'C0' : `Y${k - 1}`,
+        });
+
+        carryIn = outCarry;
+      }
+
+      return { a10, b10, steps, yOut };
+    }
+
+    function digitsToNumberString(lsdArray) {
+      return [...lsdArray].reverse().join('');
+    }
+
+    function render() {
+      const step = state.steps[state.stepIndex];
+      if (!step) {
+        return;
+      }
+
+      els.stepLabel.textContent = `Step k=${step.k} (${step.k === 0 ? 'LSD' : step.k === 10 ? 'final carry column' : 'next column'})`;
+      els.posLabel.textContent = `Model position p=${step.p}`;
+      els.stepSlider.value = String(state.stepIndex);
+
+      renderTokens(step);
+      renderRouting(step);
+      renderCircle(step);
+      renderPipeline(step);
+      renderSumLine();
+    }
+
+    function renderTokens(step) {
+      const prefixTokens = ['BOS'];
+      for (let i = 0; i < 10; i++) {
+        const s = state.steps[i];
+        prefixTokens.push(`X${i}[${s.d1},${s.d2}]`);
+      }
+      prefixTokens.push('C0');
+
+      els.prefixRow.innerHTML = prefixTokens
+        .map((t, i) => {
+          const active = i === 1 + step.k || (step.k === 10 && i === 0);
+          return `<span class="chip ${active ? 'active' : ''}">${t}</span>`;
+        })
+        .join('');
+
+      const outTokens = state.steps.map((s, i) => {
+        const classes = ['chip', 'out'];
+        if (i === step.k) {
+          classes.push('active');
+        }
+        return `<span class="${classes.join(' ')}">Y${i}[${s.outDigit},${s.outCarry}]</span>`;
+      });
+      outTokens.push('<span class="chip">EOS</span>');
+      els.outRow.innerHTML = outTokens.join('');
+    }
+
+    function renderRouting(step) {
+      const kv = [
+        ['Head 0 Source', `${step.head0}`],
+        ['Head 1 Source', `${step.head1}`],
+        ['Head 2 Source', `${step.head2}`],
+        ['carry_in', String(step.carryIn)],
+        ['d1, d2', `${step.d1}, ${step.d2}`],
+        ['out token', step.outToken],
+      ];
+      els.routingKv.innerHTML = kv
+        .map(([k, v]) => `<div><span class="k">${k}</span><span class="mono">${v}</span></div>`)
+        .join('');
+    }
+
+    function renderCircle(step) {
+      const cx = 180;
+      const cy = 180;
+      const r = 130;
+
+      let marks = '';
+      for (let d = 0; d < 10; d++) {
+        const b = DIGIT_BASIS[d];
+        const x = cx + r * b.x;
+        const y = cy - r * b.y;
+        const tx = cx + (r + 18) * b.x;
+        const ty = cy - (r + 18) * b.y;
+        marks += `<circle cx="${x.toFixed(2)}" cy="${y.toFixed(2)}" r="2.7" fill="rgba(255,255,255,0.46)"></circle>`;
+        marks += `<text x="${tx.toFixed(2)}" y="${ty.toFixed(2)}" fill="rgba(255,255,255,0.75)" font-size="12" text-anchor="middle" dominant-baseline="middle" font-family="IBM Plex Mono, monospace">${d}</text>`;
+      }
+
+      const d1b = DIGIT_BASIS[step.d1];
+      const d2b = DIGIT_BASIS[step.d2];
+      const outb = DIGIT_BASIS[step.outDigit];
+
+      const p1x = cx + r * d1b.x;
+      const p1y = cy - r * d1b.y;
+      const p2x = cx + r * d2b.x;
+      const p2y = cy - r * d2b.y;
+      const pox = cx + r * outb.x;
+      const poy = cy - r * outb.y;
+
+      const carryLabel = step.outCarry === 1 ? 'carry=1 (wrapped full turn)' : 'carry=0';
+
+      els.circleSvg.innerHTML = `
+        <rect x="0" y="0" width="360" height="360" fill="transparent"></rect>
+        <circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="rgba(255,255,255,0.3)" stroke-width="1.2"></circle>
+        <line x1="${cx}" y1="${cy}" x2="${p1x.toFixed(2)}" y2="${p1y.toFixed(2)}" stroke="#ff8a3d" stroke-width="2.5"></line>
+        <line x1="${cx}" y1="${cy}" x2="${p2x.toFixed(2)}" y2="${p2y.toFixed(2)}" stroke="#2ed8b6" stroke-width="2.5"></line>
+        <line x1="${cx}" y1="${cy}" x2="${pox.toFixed(2)}" y2="${poy.toFixed(2)}" stroke="#ffcf56" stroke-width="3.2"></line>
+        <circle cx="${p1x.toFixed(2)}" cy="${p1y.toFixed(2)}" r="5.5" fill="#ff8a3d"></circle>
+        <circle cx="${p2x.toFixed(2)}" cy="${p2y.toFixed(2)}" r="5.5" fill="#2ed8b6"></circle>
+        <circle cx="${pox.toFixed(2)}" cy="${poy.toFixed(2)}" r="6.5" fill="#ffcf56"></circle>
+        ${marks}
+        <text x="16" y="24" fill="rgba(255,255,255,0.88)" font-size="12" font-family="IBM Plex Mono, monospace">${carryLabel}</text>
+      `;
+    }
+
+    function renderPipeline(step) {
+      const h = step.hidden;
+      const blocks = [
+        ['Parse X token', `X${step.k}[${step.d1},${step.d2}]`],
+        ['Unit-circle embed', `d1=(${h.d1x.toFixed(3)}, ${h.d1y.toFixed(3)})\nd2=(${h.d2x.toFixed(3)}, ${h.d2y.toFixed(3)})`],
+        ['Carry channels', `[c0,c1]=[${h.c0}, ${h.c1}]`],
+        ['Decoded hidden', `d1=${step.d1Pred}, d2=${step.d2Pred}, carry=${step.carryIn}`],
+        ['Output token', `${step.outToken}\nsum=${step.sum}`],
+      ];
+
+      els.pipeline.innerHTML = blocks
+        .map(([title, body]) => `<div class="stage"><b>${title}</b><div class="mono">${body.replace(/\n/g, '<br/>')}</div></div>`)
+        .join('');
+    }
+
+    function renderSumLine() {
+      const a = state.a;
+      const b = state.b;
+      const expected = String(BigInt(a) + BigInt(b)).padStart(11, '0');
+      const pred = digitsToNumberString(state.steps.map((s) => s.outDigit));
+      const ok = pred === expected;
+      els.sumLine.innerHTML = `${a} + ${b} = <span class="${ok ? 'ok' : 'bad'}">${pred}</span> &nbsp;|&nbsp; expected <span class="mono">${expected}</span> &nbsp;|&nbsp; ${ok ? 'match' : 'mismatch'}`;
+    }
+
+    function recompute() {
+      state.a = pad10(clampDigits(els.aInput.value));
+      state.b = pad10(clampDigits(els.bInput.value));
+      els.aInput.value = state.a;
+      els.bInput.value = state.b;
+
+      const { steps } = computeSteps(state.a, state.b);
+      state.steps = steps;
+      if (state.stepIndex > 10) {
+        state.stepIndex = 10;
+      }
+      render();
+    }
+
+    function setStep(k) {
+      state.stepIndex = Math.max(0, Math.min(10, k));
+      render();
+    }
+
+    function togglePlay() {
+      if (state.isPlaying) {
+        clearInterval(state.timer);
+        state.timer = null;
+        state.isPlaying = false;
+        els.playBtn.textContent = 'Play';
+        return;
+      }
+
+      state.isPlaying = true;
+      els.playBtn.textContent = 'Pause';
+      state.timer = setInterval(() => {
+        if (state.stepIndex >= 10) {
+          state.stepIndex = 0;
+        } else {
+          state.stepIndex += 1;
+        }
+        render();
+      }, 880);
+    }
+
+    function random10() {
+      let out = '';
+      for (let i = 0; i < 10; i++) {
+        out += Math.floor(Math.random() * 10).toString();
+      }
+      return out;
+    }
+
+    function wireEvents() {
+      els.recalcBtn.addEventListener('click', recompute);
+      els.randomBtn.addEventListener('click', () => {
+        els.aInput.value = random10();
+        els.bInput.value = random10();
+        recompute();
+      });
+      els.playBtn.addEventListener('click', togglePlay);
+      els.stepSlider.addEventListener('input', (e) => {
+        setStep(Number(e.target.value));
+      });
+      els.aInput.addEventListener('change', recompute);
+      els.bInput.addEventListener('change', recompute);
+    }
+
+    wireEvents();
+    recompute();
+  </script>
+</body>
+</html>
