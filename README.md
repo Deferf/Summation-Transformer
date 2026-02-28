@@ -114,12 +114,28 @@ This repo includes an AdderBoard-compatible submission file:
 
 - `adderboard_submission.py`
 
-Verify it with the official checker:
+Run the verifier end-to-end:
 
 ```bash
+source .venv/bin/activate
 git clone https://github.com/anadim/AdderBoard.git /tmp/AdderBoard
 python /tmp/AdderBoard/verify.py adderboard_submission.py --seed 2025 --num-tests 10000
 ```
+
+What the verifier does:
+
+- imports `adderboard_submission.py`
+- calls `build_model()` once
+- runs fixed edge cases plus random test pairs
+- calls `add(model, a, b)` for each pair
+- reports accuracy, throughput, and qualification (`>= 99%`)
+
+Useful options:
+
+- use fewer random tests for a quick smoke check:
+  `python /tmp/AdderBoard/verify.py adderboard_submission.py --num-tests 200 --seed 2025`
+- keep official leaderboard settings:
+  `--seed 2025 --num-tests 10000`
 
 Run the visualizer by opening:
 
