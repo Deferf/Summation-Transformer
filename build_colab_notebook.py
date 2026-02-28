@@ -70,7 +70,7 @@ def make_notebook() -> nbf.NotebookNode:
                 "    \"--log-every\", \"100\",\n"
                 "    \"--eval-samples\", \"256\",\n"
                 "    \"--final-eval-samples\", \"2000\",\n"
-                "    \"--target-acc\", \"0.999\",\n"
+                "    \"--target-acc\", \"1.0\",\n"
                 "    \"--checkpoint\", ckpt_path,\n"
                 "    \"--plot-path\", plot_path,\n"
                 "]\n"
