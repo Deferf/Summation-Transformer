@@ -53,6 +53,7 @@ def make_notebook() -> nbf.NotebookNode:
         ),
         nbf.v4.new_code_cell(
             source=(
+                "import os\n"
                 "import subprocess\n"
                 "import torch\n\n"
                 "device = \"cuda\" if torch.cuda.is_available() else \"cpu\"\n"
@@ -61,6 +62,7 @@ def make_notebook() -> nbf.NotebookNode:
                 "ckpt_path = \"/content/outputs/strictish_h2_d6_singlecarry_colab.pt\"\n\n"
                 "cmd = [\n"
                 "    \"python\",\n"
+                "    \"-u\",\n"
                 "    \"train_strictish_h2_d6_singlecarry_from_scratch.py\",\n"
                 "    \"--device\", device,\n"
                 "    \"--steps\", \"1200\",\n"
@@ -72,7 +74,23 @@ def make_notebook() -> nbf.NotebookNode:
                 "    \"--checkpoint\", ckpt_path,\n"
                 "    \"--plot-path\", plot_path,\n"
                 "]\n"
-                "subprocess.run(cmd, check=True)"
+                "print(\"Running:\", \" \".join(cmd))\n"
+                "env = dict(os.environ)\n"
+                "env[\"PYTHONUNBUFFERED\"] = \"1\"\n\n"
+                "with subprocess.Popen(\n"
+                "    cmd,\n"
+                "    stdout=subprocess.PIPE,\n"
+                "    stderr=subprocess.STDOUT,\n"
+                "    text=True,\n"
+                "    bufsize=1,\n"
+                "    env=env,\n"
+                ") as proc:\n"
+                "    assert proc.stdout is not None\n"
+                "    for line in proc.stdout:\n"
+                "        print(line, end=\"\", flush=True)\n"
+                "    return_code = proc.wait()\n\n"
+                "if return_code != 0:\n"
+                "    raise RuntimeError(f\"Training failed with exit code {return_code}\")"
             ),
             metadata={"id": "train-cell"},
         ),
