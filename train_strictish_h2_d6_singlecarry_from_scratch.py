@@ -128,13 +128,14 @@ class StrictishH2D6SingleCarry(nn.Module):
     We keep d_model=6 for 2 heads (d_head=3) while using one explicit carry channel.
     """
 
-    def __init__(self, tok: Tokenizer) -> None:
+    def __init__(self, tok: Tokenizer, mlp_hidden: int = 4) -> None:
         super().__init__()
         self.tok = tok
 
         self.n_heads = 2
         self.d_head = 3
         self.d_model = 6
+        self.mlp_hidden = mlp_hidden
         self.max_len = 24
         self.prefix_len = 12
 
@@ -142,8 +143,8 @@ class StrictishH2D6SingleCarry(nn.Module):
         self.register_buffer("route_bias", self._build_route_bias())
 
         self.attn = TwoHeadAttention(self.d_model, self.n_heads, self.max_len, self.route_bias)
-        self.fc1 = nn.Linear(self.d_model, 4)
-        self.fc2 = nn.Linear(4, self.d_model)
+        self.fc1 = nn.Linear(self.d_model, self.mlp_hidden)
+        self.fc2 = nn.Linear(self.mlp_hidden, self.d_model)
 
     @torch.no_grad()
     def _build_digit_basis(self) -> torch.Tensor:
@@ -268,8 +269,8 @@ class StrictishH2D6SingleCarry(nn.Module):
 
 
 class ScratchModel(StrictishH2D6SingleCarry):
-    def __init__(self, tok: Tokenizer, init_std: float) -> None:
-        super().__init__(tok)
+    def __init__(self, tok: Tokenizer, init_std: float, mlp_hidden: int = 4) -> None:
+        super().__init__(tok, mlp_hidden=mlp_hidden)
         self.reinit_from_scratch(init_std)
 
     @torch.no_grad()
@@ -405,10 +406,13 @@ def train(args: argparse.Namespace) -> None:
     device = torch.device(args.device)
 
     tok = Tokenizer()
-    model = ScratchModel(tok, init_std=args.init_std).to(device)
+    model = ScratchModel(tok, init_std=args.init_std, mlp_hidden=args.mlp_hidden).to(device)
 
     print(f"trainable_params={count_trainable_params(model)}")
-    print("architecture: n_heads=2 d_model=6 mlp_hidden=4 (semantic channels: d1xy, d2xy, carry, aux)")
+    print(
+        f"architecture: n_heads=2 d_model=6 mlp_hidden={args.mlp_hidden} "
+        "(semantic channels: d1xy, d2xy, carry, aux)"
+    )
 
     optimizer = torch.optim.Adam(model.parameters(), lr=args.lr)
     bce = nn.BCEWithLogitsLoss()
@@ -493,6 +497,7 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--steps", type=int, default=4000)
     p.add_argument("--batch-size", type=int, default=256)
     p.add_argument("--lr", type=float, default=0.02)
+    p.add_argument("--mlp-hidden", type=int, default=4)
     p.add_argument("--init-std", type=float, default=0.08)
     p.add_argument("--log-every", type=int, default=100)
     p.add_argument("--eval-samples", type=int, default=256)
