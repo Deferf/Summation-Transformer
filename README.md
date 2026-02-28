@@ -4,19 +4,19 @@ This repository explores multiple decoder-style architectures for exact 10-digit
 
 [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/Deferf/Summation-Transformer/blob/main/colab_train_strictish_h2_d6_singlecarry.ipynb)
 
-## Key Result: 202 Trainable Weights
+## Key Result: 163 Trainable Weights
 
-The strongest compact trainable variant currently reaches exact 10-digit addition with only **202 trainable weights**:
+The strongest compact trainable variant currently reaches exact 10-digit addition with only **163 trainable weights**:
 
 - script: `train_strictish_h2_d6_singlecarry_from_scratch.py`
-- architecture: `n_heads=2`, `d_model=6`, `mlp_hidden=4`
+- architecture: `n_heads=2`, `d_model=6`, `mlp_hidden=1`
 - trainable layers only: Q/K/V/O projections + narrow MLP
 
-Parameter breakdown (`202` total):
+Parameter breakdown (`163` total):
 - attention projections: `4 x (6 x 6) = 144`
-- MLP first layer: `(6 x 4) + 4 = 28`
-- MLP second layer: `(4 x 6) + 6 = 30`
-- total: `144 + 28 + 30 = 202`
+- MLP first layer: `(6 x 1) + 1 = 7`
+- MLP second layer: `(1 x 6) + 6 = 12`
+- total: `144 + 7 + 12 = 163`
 
 ## Problem Setup
 
@@ -63,7 +63,7 @@ Sequence format (LSD-first internals):
   smaller `n_heads=2`, `d_model=4` trainable variant.
 - `train_strictish_h2_d6_singlecarry_from_scratch.py`:
   no pre-summed leakage features, raw digit channels + single carry channel, trainable from scratch.
-  **Current compact milestone: 202 trainable weights.**
+  **Current compact milestone: 163 trainable weights.**
 
 ### 4) Visualization
 
@@ -88,9 +88,9 @@ python build_colab_notebook.py
 
 Example output from:
 
-`train_strictish_h2_d6_singlecarry_from_scratch.py`
+`train_strictish_h2_d6_singlecarry_from_scratch.py --mlp-hidden 1`
 
-![Training Loss and Exact Accuracy](assets/strictish_h2_d6_metrics.png)
+![Training Loss and Exact Accuracy](assets/strictish_h2_d6_163_metrics.png)
 
 ## Quickstart
 
