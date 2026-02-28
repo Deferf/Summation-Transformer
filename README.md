@@ -2,6 +2,8 @@
 
 This repository explores multiple decoder-style architectures for exact 10-digit addition, from hardcoded symbolic models to trainable compact transformer variants.
 
+[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/Deferf/Summation-Transformer/blob/main/colab_train_strictish_h2_d6_singlecarry.ipynb)
+
 ## Problem Setup
 
 All models use fixed-width addition of two numbers in `[0, 10^10)` and predict an 11-digit sum.
@@ -52,6 +54,12 @@ Sequence format (LSD-first internals):
 
 - `interactive_strictish_sub300_visualizer.html`:
   interactive web visualization of the token-to-output transformation pipeline.
+
+### 5) Google Colab Runner
+
+- `colab_train_strictish_h2_d6_singlecarry.ipynb`:
+  runnable Colab notebook for `train_strictish_h2_d6_singlecarry_from_scratch.py`.
+  It stores artifacts in `/content/outputs` to avoid local-only paths such as `checkpoints/`.
 
 ## Training Plot (Loss + Exact Accuracy)
 
