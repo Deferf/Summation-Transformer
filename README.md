@@ -4,19 +4,33 @@ This repository explores multiple decoder-style architectures for exact 10-digit
 
 [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/Deferf/Summation-Transformer/blob/main/colab_train_strictish_h2_d6_singlecarry.ipynb)
 
-## Key Result: 163 Trainable Weights
+## Key Result: 37 Trainable Weights
 
-The strongest compact trainable variant currently reaches exact 10-digit addition with only **163 trainable weights**:
+The strongest compact trainable variant currently reaches exact 10-digit addition with only **37 trainable weights**:
 
 - script: `train_strictish_h2_d6_singlecarry_from_scratch.py`
 - architecture: `n_heads=2`, `d_model=6`, `mlp_hidden=1`
-- trainable layers only: Q/K/V/O projections + narrow MLP
+- projection style: fixed orthogonal DCT-like basis with trainable spectral diagonals
+- MLP biasing: inner bias enabled, outer bias disabled
 
-Parameter breakdown (`163` total):
-- attention projections: `4 x (6 x 6) = 144`
-- MLP first layer: `(6 x 1) + 1 = 7`
-- MLP second layer: `(1 x 6) + 6 = 12`
-- total: `144 + 7 + 12 = 163`
+Parameter breakdown (`37` total):
+- attention spectral scales: `q(6) + k(6) + v(6) + o(6) = 24`
+- MLP first layer: `(1 x 6) + 1 = 7`
+- MLP second layer: `(6 x 1) = 6`
+- total: `24 + 7 + 6 = 37`
+
+Note: the orthogonal DCT-like basis is fixed (buffer), so it is not counted as trainable parameters.
+
+## Recent Compression Results
+
+Measured with this repository's training/eval protocol:
+
+| Variant | Trainable Params | Final Exact Accuracy |
+|---|---:|---:|
+| Dense Q/K/V/O + MLP (`mlp_hidden=1`) | 163 | 1.0000 |
+| Spectral Q/K/V fixed-basis diag, dense O | 73 | 1.0000 |
+| Spectral Q/K/V/O fixed-basis diag, no MLP biases | 36 | 0.7185 (at 40k steps) |
+| Spectral Q/K/V/O fixed-basis diag, inner MLP bias only | **37** | **1.0000** |
 
 ## Problem Setup
 
@@ -63,7 +77,7 @@ Sequence format (LSD-first internals):
   smaller `n_heads=2`, `d_model=4` trainable variant.
 - `train_strictish_h2_d6_singlecarry_from_scratch.py`:
   no pre-summed leakage features, raw digit channels + single carry channel, trainable from scratch.
-  **Current compact milestone: 163 trainable weights.**
+  **Current compact milestone: 37 trainable weights.**
 
 ### 4) Visualization
 
@@ -74,7 +88,7 @@ Sequence format (LSD-first internals):
 
 - `colab_train_strictish_h2_d6_singlecarry.ipynb`:
   runnable Colab notebook for `train_strictish_h2_d6_singlecarry_from_scratch.py`.
-  It stores artifacts in `/content/outputs` to avoid local-only paths such as `checkpoints/`.
+  It runs the 37-parameter spectral configuration and stores artifacts in `/content/outputs`.
 - `build_colab_notebook.py`:
   generates the notebook via `nbformat` so cell formatting remains valid and reproducible.
 
@@ -88,9 +102,9 @@ python build_colab_notebook.py
 
 Example output from:
 
-`train_strictish_h2_d6_singlecarry_from_scratch.py --mlp-hidden 1`
+`train_strictish_h2_d6_singlecarry_from_scratch.py --mlp-hidden 1 --mlp-bias-inner --spectral-qkv --spectral-o`
 
-![Training Loss and Exact Accuracy](assets/strictish_h2_d6_163_metrics.png)
+![Training Loss and Exact Accuracy](assets/strictish_h2_d6_37_metrics.png)
 
 ## Quickstart
 
@@ -105,7 +119,19 @@ pip install -r requirements.txt
 Run one of the training scripts:
 
 ```bash
-python train_strictish_h2_d6_singlecarry_from_scratch.py --device cpu
+python train_strictish_h2_d6_singlecarry_from_scratch.py \
+  --device cpu \
+  --steps 4000 \
+  --batch-size 256 \
+  --lr 0.02 \
+  --mlp-hidden 1 \
+  --mlp-bias-inner \
+  --spectral-qkv \
+  --spectral-o \
+  --log-every 100 \
+  --eval-samples 256 \
+  --final-eval-samples 2000 \
+  --target-acc 1.1
 ```
 
 ## AdderBoard Verification

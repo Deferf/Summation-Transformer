@@ -76,10 +76,55 @@ class Batch:
     gt_carry_in: torch.Tensor
 
 
+class LowRankLinear(nn.Module):
+    """Low-rank linear layer: out = x @ (U @ V)^T with rank r."""
+
+    def __init__(self, in_features: int, out_features: int, rank: int) -> None:
+        super().__init__()
+        if rank <= 0:
+            raise ValueError("rank must be > 0 for LowRankLinear")
+        self.in_proj = nn.Linear(in_features, rank, bias=False)
+        self.out_proj = nn.Linear(rank, out_features, bias=False)
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        return self.out_proj(self.in_proj(x))
+
+
+class SpectralLinearFixedU(nn.Module):
+    """Square linear map with fixed orthogonal basis and trainable diagonal only.
+
+    Implements W = U diag(s) U^T where U is fixed (not trainable) and s is trainable.
+    """
+
+    def __init__(self, d_model: int, basis: torch.Tensor) -> None:
+        super().__init__()
+        if basis.shape != (d_model, d_model):
+            raise ValueError(f"basis must be [{d_model},{d_model}], got {tuple(basis.shape)}")
+        self.d_model = d_model
+        self.register_buffer("basis", basis)
+        self.scales = nn.Parameter(torch.ones(d_model, dtype=torch.float32))
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        x_u = x @ self.basis
+        x_u = x_u * self.scales
+        return x_u @ self.basis.t()
+
+
 class TwoHeadAttention(nn.Module):
     """2-head causal attention with fixed route bias; all projections are trainable."""
 
-    def __init__(self, d_model: int, n_heads: int, max_len: int, route_bias: torch.Tensor) -> None:
+    def __init__(
+        self,
+        d_model: int,
+        n_heads: int,
+        max_len: int,
+        route_bias: torch.Tensor,
+        attn_rank: int = 0,
+        factorize_o: bool = False,
+        spectral_qkv: bool = False,
+        spectral_o: bool = False,
+        spectral_basis: torch.Tensor | None = None,
+    ) -> None:
         super().__init__()
         if d_model % n_heads != 0:
             raise ValueError("d_model must be divisible by n_heads")
@@ -88,10 +133,38 @@ class TwoHeadAttention(nn.Module):
         self.n_heads = n_heads
         self.d_head = d_model // n_heads
 
-        self.q_proj = nn.Linear(d_model, d_model, bias=False)
-        self.k_proj = nn.Linear(d_model, d_model, bias=False)
-        self.v_proj = nn.Linear(d_model, d_model, bias=False)
-        self.o_proj = nn.Linear(d_model, d_model, bias=False)
+        if spectral_qkv and attn_rank > 0:
+            raise ValueError("Choose either spectral_qkv or attn_rank low-rank, not both")
+
+        use_lowrank = attn_rank > 0
+        use_spectral = spectral_qkv
+
+        if use_spectral:
+            if spectral_basis is None:
+                raise ValueError("spectral_basis is required when spectral_qkv=True")
+            self.q_proj = SpectralLinearFixedU(d_model, spectral_basis)
+            self.k_proj = SpectralLinearFixedU(d_model, spectral_basis)
+            self.v_proj = SpectralLinearFixedU(d_model, spectral_basis)
+            self.o_proj = (
+                SpectralLinearFixedU(d_model, spectral_basis)
+                if spectral_o
+                else nn.Linear(d_model, d_model, bias=False)
+            )
+        else:
+            self.q_proj = (
+                LowRankLinear(d_model, d_model, attn_rank) if use_lowrank else nn.Linear(d_model, d_model, bias=False)
+            )
+            self.k_proj = (
+                LowRankLinear(d_model, d_model, attn_rank) if use_lowrank else nn.Linear(d_model, d_model, bias=False)
+            )
+            self.v_proj = (
+                LowRankLinear(d_model, d_model, attn_rank) if use_lowrank else nn.Linear(d_model, d_model, bias=False)
+            )
+            self.o_proj = (
+                LowRankLinear(d_model, d_model, attn_rank)
+                if (use_lowrank and factorize_o)
+                else nn.Linear(d_model, d_model, bias=False)
+            )
 
         self.register_buffer("route_bias", route_bias)
 
@@ -128,7 +201,15 @@ class StrictishH2D6SingleCarry(nn.Module):
     We keep d_model=6 for 2 heads (d_head=3) while using one explicit carry channel.
     """
 
-    def __init__(self, tok: Tokenizer, mlp_hidden: int = 4) -> None:
+    def __init__(
+        self,
+        tok: Tokenizer,
+        mlp_hidden: int = 4,
+        attn_rank: int = 0,
+        factorize_o: bool = False,
+        mlp_bias_inner: bool = False,
+        mlp_bias_outer: bool = False,
+    ) -> None:
         super().__init__()
         self.tok = tok
 
@@ -136,15 +217,32 @@ class StrictishH2D6SingleCarry(nn.Module):
         self.d_head = 3
         self.d_model = 6
         self.mlp_hidden = mlp_hidden
+        self.attn_rank = attn_rank
+        self.factorize_o = factorize_o
+        self.mlp_bias_inner = mlp_bias_inner
+        self.mlp_bias_outer = mlp_bias_outer
+        self.spectral_qkv = False
+        self.spectral_o = False
         self.max_len = 24
         self.prefix_len = 12
 
         self.register_buffer("digit_basis", self._build_digit_basis())
+        self.register_buffer("spectral_basis", self._build_dct_basis())
         self.register_buffer("route_bias", self._build_route_bias())
 
-        self.attn = TwoHeadAttention(self.d_model, self.n_heads, self.max_len, self.route_bias)
-        self.fc1 = nn.Linear(self.d_model, self.mlp_hidden)
-        self.fc2 = nn.Linear(self.mlp_hidden, self.d_model)
+        self.attn = TwoHeadAttention(
+            self.d_model,
+            self.n_heads,
+            self.max_len,
+            self.route_bias,
+            attn_rank=self.attn_rank,
+            factorize_o=self.factorize_o,
+            spectral_qkv=self.spectral_qkv,
+            spectral_o=self.spectral_o,
+            spectral_basis=self.spectral_basis,
+        )
+        self.fc1 = nn.Linear(self.d_model, self.mlp_hidden, bias=self.mlp_bias_inner)
+        self.fc2 = nn.Linear(self.mlp_hidden, self.d_model, bias=self.mlp_bias_outer)
 
     @torch.no_grad()
     def _build_digit_basis(self) -> torch.Tensor:
@@ -153,6 +251,19 @@ class StrictishH2D6SingleCarry(nn.Module):
             theta = 2.0 * math.pi * d / 10.0
             vecs.append([math.cos(theta), math.sin(theta)])
         return torch.tensor(vecs, dtype=torch.float32)
+
+    @torch.no_grad()
+    def _build_dct_basis(self) -> torch.Tensor:
+        """Orthonormal DCT-II-like basis used as fixed spectral rotation."""
+        n = self.d_model
+        basis = torch.zeros((n, n), dtype=torch.float32)
+        scale0 = math.sqrt(1.0 / n)
+        scale = math.sqrt(2.0 / n)
+        for k in range(n):
+            alpha = scale0 if k == 0 else scale
+            for i in range(n):
+                basis[i, k] = alpha * math.cos(math.pi * (i + 0.5) * k / n)
+        return basis
 
     @torch.no_grad()
     def _build_route_bias(self) -> torch.Tensor:
@@ -269,8 +380,40 @@ class StrictishH2D6SingleCarry(nn.Module):
 
 
 class ScratchModel(StrictishH2D6SingleCarry):
-    def __init__(self, tok: Tokenizer, init_std: float, mlp_hidden: int = 4) -> None:
-        super().__init__(tok, mlp_hidden=mlp_hidden)
+    def __init__(
+        self,
+        tok: Tokenizer,
+        init_std: float,
+        mlp_hidden: int = 4,
+        attn_rank: int = 0,
+        factorize_o: bool = False,
+        mlp_bias_inner: bool = False,
+        mlp_bias_outer: bool = False,
+        spectral_qkv: bool = False,
+        spectral_o: bool = False,
+    ) -> None:
+        super().__init__(
+            tok,
+            mlp_hidden=mlp_hidden,
+            attn_rank=attn_rank,
+            factorize_o=factorize_o,
+            mlp_bias_inner=mlp_bias_inner,
+            mlp_bias_outer=mlp_bias_outer,
+        )
+        if spectral_qkv:
+            self.spectral_qkv = True
+            self.spectral_o = spectral_o
+            self.attn = TwoHeadAttention(
+                self.d_model,
+                self.n_heads,
+                self.max_len,
+                self.route_bias,
+                attn_rank=0,
+                factorize_o=False,
+                spectral_qkv=True,
+                spectral_o=spectral_o,
+                spectral_basis=self.spectral_basis,
+            )
         self.reinit_from_scratch(init_std)
 
     @torch.no_grad()
@@ -406,11 +549,24 @@ def train(args: argparse.Namespace) -> None:
     device = torch.device(args.device)
 
     tok = Tokenizer()
-    model = ScratchModel(tok, init_std=args.init_std, mlp_hidden=args.mlp_hidden).to(device)
+    model = ScratchModel(
+        tok,
+        init_std=args.init_std,
+        mlp_hidden=args.mlp_hidden,
+        attn_rank=args.attn_rank,
+        factorize_o=args.factorize_o,
+        mlp_bias_inner=args.mlp_bias_inner,
+        mlp_bias_outer=args.mlp_bias_outer,
+        spectral_qkv=args.spectral_qkv,
+        spectral_o=args.spectral_o,
+    ).to(device)
 
     print(f"trainable_params={count_trainable_params(model)}")
     print(
         f"architecture: n_heads=2 d_model=6 mlp_hidden={args.mlp_hidden} "
+        f"attn_rank={args.attn_rank} factorize_o={args.factorize_o} "
+        f"mlp_bias_inner={args.mlp_bias_inner} mlp_bias_outer={args.mlp_bias_outer} "
+        f"spectral_qkv={args.spectral_qkv} spectral_o={args.spectral_o} "
         "(semantic channels: d1xy, d2xy, carry, aux)"
     )
 
@@ -498,6 +654,12 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--batch-size", type=int, default=256)
     p.add_argument("--lr", type=float, default=0.02)
     p.add_argument("--mlp-hidden", type=int, default=4)
+    p.add_argument("--attn-rank", type=int, default=0)
+    p.add_argument("--factorize-o", action="store_true")
+    p.add_argument("--mlp-bias-inner", action="store_true")
+    p.add_argument("--mlp-bias-outer", action="store_true")
+    p.add_argument("--spectral-qkv", action="store_true")
+    p.add_argument("--spectral-o", action="store_true")
     p.add_argument("--init-std", type=float, default=0.08)
     p.add_argument("--log-every", type=int, default=100)
     p.add_argument("--eval-samples", type=int, default=256)
