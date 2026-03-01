@@ -110,6 +110,59 @@ def make_notebook() -> nbf.NotebookNode:
         ),
         nbf.v4.new_markdown_cell(
             source=(
+                "## AdderBoard Verification\n\n"
+                "Runs the official verifier against `adderboard_submission.py`, streams output "
+                "live, and saves the full verifier log to `/content/outputs/adderboard_verify_colab.log`."
+            ),
+            metadata={"id": "verify-md"},
+        ),
+        nbf.v4.new_code_cell(
+            source=(
+                "import os\n"
+                "import subprocess\n\n"
+                "VERIFIER_REPO = \"/content/AdderBoard\"\n"
+                "VERIFY_LOG = \"/content/outputs/adderboard_verify_colab.log\"\n"
+                "SUBMISSION = \"/content/Summation-Transformer/adderboard_submission.py\"\n"
+                "NUM_TESTS = 10000  # lower for a faster smoke run\n"
+                "SEED = 2025\n\n"
+                "if not os.path.exists(VERIFIER_REPO):\n"
+                "    !git clone https://github.com/anadim/AdderBoard.git {VERIFIER_REPO}\n\n"
+                "cmd = [\n"
+                "    \"python\",\n"
+                "    f\"{VERIFIER_REPO}/verify.py\",\n"
+                "    SUBMISSION,\n"
+                "    \"--seed\", str(SEED),\n"
+                "    \"--num-tests\", str(NUM_TESTS),\n"
+                "]\n"
+                "print(\"Running:\", \" \".join(cmd))\n\n"
+                "env = dict(os.environ)\n"
+                "env[\"PYTHONUNBUFFERED\"] = \"1\"\n\n"
+                "with open(VERIFY_LOG, \"w\", encoding=\"utf-8\") as logf:\n"
+                "    with subprocess.Popen(\n"
+                "        cmd,\n"
+                "        stdout=subprocess.PIPE,\n"
+                "        stderr=subprocess.STDOUT,\n"
+                "        text=True,\n"
+                "        bufsize=1,\n"
+                "        env=env,\n"
+                "    ) as proc:\n"
+                "        assert proc.stdout is not None\n"
+                "        for line in proc.stdout:\n"
+                "            print(line, end=\"\", flush=True)\n"
+                "            logf.write(line)\n"
+                "        return_code = proc.wait()\n\n"
+                "if return_code != 0:\n"
+                "    raise RuntimeError(f\"Verifier failed with exit code {return_code}\")\n\n"
+                "print(f\"\\nSaved verifier log: {VERIFY_LOG}\")\n"
+                "print(\"\\n=== Verifier Tail ===\")\n"
+                "with open(VERIFY_LOG, \"r\", encoding=\"utf-8\") as f:\n"
+                "    tail = f.readlines()[-40:]\n"
+                "print(\"\".join(tail))"
+            ),
+            metadata={"id": "verify-cell"},
+        ),
+        nbf.v4.new_markdown_cell(
+            source=(
                 "## Inference Playground (with logits)\n\n"
                 "Enter any two 10-digit-or-smaller non-negative integers. "
                 "The cell decodes autoregressively and prints top-k logits at each step."

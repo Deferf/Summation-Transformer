@@ -88,7 +88,7 @@ Sequence format (LSD-first internals):
 
 - `colab_train_strictish_h2_d6_singlecarry.ipynb`:
   runnable Colab notebook for `train_strictish_h2_d6_singlecarry_from_scratch.py`.
-  It runs the 37-parameter spectral configuration and stores artifacts in `/content/outputs`.
+  It runs the 37-parameter spectral configuration, runs AdderBoard `verify.py`, and stores artifacts/logs in `/content/outputs`.
 - `build_colab_notebook.py`:
   generates the notebook via `nbformat` so cell formatting remains valid and reproducible.
 
