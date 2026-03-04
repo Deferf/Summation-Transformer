@@ -293,25 +293,29 @@ class StrictishH2D6SingleCarry(nn.Module):
         # BOS behaves like X[0,0] for k=10.
         bos_mask = input_ids == self.tok.BOS
         if bos_mask.any():
-            x[bos_mask, 0] = self.digit_basis[0, 0]
-            x[bos_mask, 1] = self.digit_basis[0, 1]
-            x[bos_mask, 2] = self.digit_basis[0, 0]
-            x[bos_mask, 3] = self.digit_basis[0, 1]
+            br, bc = bos_mask.nonzero(as_tuple=True)
+            x[br, bc, 0] = self.digit_basis[0, 0]
+            x[br, bc, 1] = self.digit_basis[0, 1]
+            x[br, bc, 2] = self.digit_basis[0, 0]
+            x[br, bc, 3] = self.digit_basis[0, 1]
 
         # X[d1,d2]
         x_mask = (input_ids >= self.tok.X_BASE) & (input_ids < self.tok.X_BASE + 100)
         if x_mask.any():
-            xv = input_ids[x_mask] - self.tok.X_BASE
+            xr, xc = x_mask.nonzero(as_tuple=True)
+            xv = input_ids[xr, xc] - self.tok.X_BASE
             d1 = torch.div(xv, 10, rounding_mode="floor")
             d2 = xv % 10
-            x[x_mask, 0] = self.digit_basis[d1, 0]
-            x[x_mask, 1] = self.digit_basis[d1, 1]
-            x[x_mask, 2] = self.digit_basis[d2, 0]
-            x[x_mask, 3] = self.digit_basis[d2, 1]
+            x[xr, xc, 0] = self.digit_basis[d1, 0]
+            x[xr, xc, 1] = self.digit_basis[d1, 1]
+            x[xr, xc, 2] = self.digit_basis[d2, 0]
+            x[xr, xc, 3] = self.digit_basis[d2, 1]
 
         # carry channel from C0 and Y tokens
         y1_mask = (input_ids >= self.tok.Y1_BASE) & (input_ids < self.tok.Y1_BASE + 10)
-        x[y1_mask, 4] = 1.0
+        if y1_mask.any():
+            yr, yc = y1_mask.nonzero(as_tuple=True)
+            x[yr, yc, 4] = 1.0
 
         return x
 
